@@ -4,4 +4,5 @@ This is an automated bot to allow the GPIES Data Cruncher chat on Slack.
 
 ### Requirements
   * Python3 (configparaser)
-  * slackclient python library
+  * SlackClient python library
+  * Slacker python library
