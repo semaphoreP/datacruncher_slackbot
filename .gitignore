@@ -1,6 +1,12 @@
 # Top Secret Config File!
 config.ini
 
+# temp files
+tmp.png
+
+# vscode iles
+.vscode/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
