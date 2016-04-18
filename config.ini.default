@@ -1,5 +1,3 @@
 [DEFAULT]
-ServerAliveInterval = 45
-Compression = yes
-CompressionLevel = 9
-ForwardX11 = yes
+username = data_cruncher
+token = asdfasdfasdfasdf
