@@ -51,10 +51,12 @@ class NewImagePoster(FileSystemEventHandler):
                 return
             
             filepath = self.newfiles.pop(0)
+            
+        # get title and make image after getting new klip file
         title = display_image.get_title_from_filename(filepath)
         display_image.save_klcube_image(filepath, "tmp.png", title=title)
-        print(self.slacker.chat.post_message('@jwang', 'Beep. Boop. {0}'.format(filepath), username=username, as_user=True).raw)
-
+        #print(self.slacker.chat.post_message('@jwang', 'Beep. Boop. {0}'.format(filepath), username=username, as_user=True).raw)
+        print(self.slacker.chat.post_message('@jwang', "Beep. Boop. I just finished a PSF Subtraction for {0}. Here's a quicklook image.".format(title), username=username, as_user=True).raw)
         print(self.slacker.files.upload('tmp.png', channels="@jwang",filename="{0}.png".format(title.replace(" ", "_")), title=title ).raw)
         return
     
@@ -100,20 +102,23 @@ class NewImagePoster(FileSystemEventHandler):
         """
         watchdog function to run when an existing file is modified
         """
-        print(event)
         self.process_new_file_event(event)
     
 
 class ChatResponder(Thread):
-    def __init__(self, slack_bot):
+    def __init__(self, dropboxdir, slack_bot, slacker):
         """
         Init
         
         Args:
+            dropboxdir: absolute dropbox path
             slack_bot: a SlackClient instance
+            slacker: a Slacker instance
         """
         super(ChatResponder, self).__init__()
+        self.dropboxdir = dropboxdir
         self.slack_client = slack_bot
+        self.slacker = slacker
 
     def run(self):
         connected = self.slack_client.rtm_connect()
@@ -141,17 +146,17 @@ class ChatResponder(Thread):
             band: the band
             mode: obsmode
         """
-        request_args = request.split()
+        request_args = request.split(',')
         
-        objname = request_args[0].replace(" ", "_")
+        objname = request_args[0].strip().replace(" ", "_")
    
         # get object name dropbox path
-        auto_dirpath = os.path.join("GPIDATA", objname, "autoreduced")
+        auto_dirpath = os.path.join(self.dropboxdir, "GPIDATA", objname, "autoreduced")
         # make sure folder exists
         if not os.path.isdir(auto_dirpath):
             return None
        
-        date_folders = [fname for fname in os.listdir(".") if os.path.isdir(fname)]
+        date_folders = [fname for fname in os.listdir(auto_dirpath) if os.path.isdir(os.path.join(auto_dirpath, fname))]
         if len(date_folders) == 0:
             # no subdirs, uh oh
             return None
@@ -162,23 +167,23 @@ class ChatResponder(Thread):
         else:
             date = request_args[1]
             if len(request_args) == 2:
-                date = request_args[1]
+                date = request_args[1].strip()
                 date_folders = [fname for fname in date_folders if date in fname]
                 if len(date_folders) == 0:
                     # date is invalid
                     return None
                 datefolder = date_folders[0]
             else:
-                band = request_args[2]
+                band = request_args[2].strip()
                 if len(request_args) ==3:
-                    dateband = "{0}_[1}".format(date, band)
+                    dateband = "{0}_{1}".format(date, band)
                     date_folders = [fname for fname in date_folders if date in fname]
                     if len(date_folders) == 0:
                         # date/band is invalid
                         return None
                     datefolder = date_folders[0]
                 else:
-                    mode = request_args[3]
+                    mode = request_args[3].strip()
                     dateband = "{0}_{1}_{2}".format(date, band, mode)
                     date_folders = [fname for fname in date_folders if date in fname]
                     if len(date_folders) == 0:
@@ -192,12 +197,14 @@ class ChatResponder(Thread):
         band = dateband[1]
         mode = dateband[2]
  
-        dirpath = os.path.join(auto_dirpath,  "{0}_{1}_{2}".format(datestring, band, mode))
+        dirpath = os.path.join(auto_dirpath,  "{0}_{1}_{2}".format(date, band, mode))
         if mode == "Spec":
             pyklip_name = "pyklip-S{date}-{band}-k150a9s4m1-KLmodes-all.fits"
         else:
             pyklip_name = "pyklip-S{date}-{band}-pol-k150a9s1m1-ADI-KLmodes-all.fits"
     
+        pyklip_name = pyklip_name.format(date=date, band=band)
+        
         filename = os.path.join(dirpath, pyklip_name)
         return filename, objname, date, band, mode
 
@@ -220,10 +227,32 @@ class ChatResponder(Thread):
         msg = msg.strip()
         if (msg.upper()[:4] == "SHOW") | (msg.upper()[:7] == "SHOW ME"):
             # Someone wants us to show them something!!
-            reply = 'I received your text of "{0}"!'.format(msg)
-            full_reply = '<@{user}>: '.format(user=sender) + reply
-            print(sc.api_call("chat.postMessage", channel=channel, text=full_reply, username=username, as_user=True))
+            # strip off the "Show (me)?"
+            if "SHOW ME" in msg.upper():
+                msg = msg[7:]
+            else:
+                msg = msg[4:]
+            msg = msg.strip()
             
+            # get requested pyklip reduction by parsing message
+            klip_info = self.get_klipped_img_info(msg)
+            if klip_info is None:
+                reply = "Beep. Boop. I'm sorry, but I couldn't find the data you requested"
+            else:
+                # found it. Let's get the details of the request
+                pyklip_filename, objname, date, band, mode = klip_info
+                
+                reply = 'Beep. Boop. Retrieving {obj} taken on {date} in {band}-{mode}...'.format(obj=objname, date=date, band=band, mode=mode)
+                
+                # generate image to upload
+                title = display_image.get_title_from_filename(pyklip_filename)
+                display_image.save_klcube_image(pyklip_filename, "tmp.png", title=title)
+                
+            # generate and send reply
+            full_reply = '<@{user}>: '.format(user=sender) + reply
+            print(self.slack_client.api_call("chat.postMessage", channel=channel, text=full_reply, username=username, as_user=True))
+            # upload image
+            print(self.slacker.files.upload('tmp.png', channels="@jwang",filename="{0}.png".format(title.replace(" ", "_")), title=title ).raw)
             
     def parse_txt(self, msg):
         """
@@ -287,7 +316,7 @@ class ChatResponder(Thread):
     
 # using Slacker as it's file upload interface is much better
 client = Slacker(token)
-print(client.chat.post_message('@jwang', 'Beep. Boop', username=username, as_user=True).raw)
+print(client.chat.post_message('@jwang', 'Beep. Boop.', username=username, as_user=True).raw)
 # print(client.files.upload('tmp.png', channels="@jwang",filename="HD_95086_160229_H_Spec.png", title="HD 95086 2016-02-29 H-Spec" ).raw)
 
 
@@ -296,7 +325,7 @@ print(client.chat.post_message('@jwang', 'Beep. Boop', username=username, as_use
 # Run real time message slack client 
 sc = SlackClient(token)
 
-p = ChatResponder(sc)
+p = ChatResponder(dropboxdir, sc, client)
 p.daemon = True
 
 
