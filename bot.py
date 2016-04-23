@@ -1,4 +1,9 @@
-import configparser
+import sys
+if sys.version_info < (3,0):
+    #python 2.7 behavior
+    import ConfigParser as configparser
+else:
+    import configparser
 import time
 import threading
 from threading import Thread
@@ -11,17 +16,17 @@ from slacker import Slacker
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-
+import display_image
     
 
 # Read in configuration from config.ini
 # Note that config.ini should never be versioned on git!!!
 config = configparser.ConfigParser()
 config.read("config.ini")
-username = config['DEFAULT']['username']
-token = config['DEFAULT']['token']
-uid = config['DEFAULT']['id']
-dropboxdir = os.path.normpath(config['DEFAULT']['dropboxdir'])
+username = config.get('DEFAULT','username')
+token = config.get('DEFAULT', 'token')
+uid = config.get('DEFAULT', 'id')
+dropboxdir = os.path.normpath(config.get('DEFAULT', 'dropboxdir'))
 
 class NewImagePoster(FileSystemEventHandler):
     """
@@ -46,7 +51,11 @@ class NewImagePoster(FileSystemEventHandler):
                 return
             
             filepath = self.newfiles.pop(0)
-            print(self.slacker.chat.post_message('@jwang', 'Beep. Boop. {0}'.format(filepath), username=username, as_user=True).raw)
+        title = display_image.get_title_from_filename(filepath)
+        display_image.save_klcube_image(filepath, "tmp.png", title=title)
+        print(self.slacker.chat.post_message('@jwang', 'Beep. Boop. {0}'.format(filepath), username=username, as_user=True).raw)
+
+        print(self.slacker.files.upload('tmp.png', channels="@jwang",filename="{0}.png".format(title.replace(" ", "_")), title=title ).raw)
         return
     
     
@@ -80,16 +89,18 @@ class NewImagePoster(FileSystemEventHandler):
         
         
     def on_created(self, event):
+
         """
         watchdog function to run when a new file appears
         """
         self.process_new_file_event(event)
 
         
-    def on_modifed(self, event):
+    def on_modified(self, event):
         """
         watchdog function to run when an existing file is modified
         """
+        print(event)
         self.process_new_file_event(event)
     
 
@@ -127,9 +138,68 @@ class ChatResponder(Thread):
             filename: the full path to the klipped image
             objname: object name (with spaces)
             date: with dashes
+            band: the band
             mode: obsmode
         """
-        raise NotImplementedError
+        request_args = request.split()
+        
+        objname = request_args[0].replace(" ", "_")
+   
+        # get object name dropbox path
+        auto_dirpath = os.path.join("GPIDATA", objname, "autoreduced")
+        # make sure folder exists
+        if not os.path.isdir(auto_dirpath):
+            return None
+       
+        date_folders = [fname for fname in os.listdir(".") if os.path.isdir(fname)]
+        if len(date_folders) == 0:
+            # no subdirs, uh oh
+            return None
+
+        # check how many args are passed in
+        if len(request_args) == 1:
+            datefolder = date_folders[0]
+        else:
+            date = request_args[1]
+            if len(request_args) == 2:
+                date = request_args[1]
+                date_folders = [fname for fname in date_folders if date in fname]
+                if len(date_folders) == 0:
+                    # date is invalid
+                    return None
+                datefolder = date_folders[0]
+            else:
+                band = request_args[2]
+                if len(request_args) ==3:
+                    dateband = "{0}_[1}".format(date, band)
+                    date_folders = [fname for fname in date_folders if date in fname]
+                    if len(date_folders) == 0:
+                        # date/band is invalid
+                        return None
+                    datefolder = date_folders[0]
+                else:
+                    mode = request_args[3]
+                    dateband = "{0}_{1}_{2}".format(date, band, mode)
+                    date_folders = [fname for fname in date_folders if date in fname]
+                    if len(date_folders) == 0:
+                        # date/band is invalid
+                        return None
+                    datefolder = date_folders[0]
+
+
+        dateband = datefolder.split("_")
+        date = dateband[0]
+        band = dateband[1]
+        mode = dateband[2]
+ 
+        dirpath = os.path.join(auto_dirpath,  "{0}_{1}_{2}".format(datestring, band, mode))
+        if mode == "Spec":
+            pyklip_name = "pyklip-S{date}-{band}-k150a9s4m1-KLmodes-all.fits"
+        else:
+            pyklip_name = "pyklip-S{date}-{band}-pol-k150a9s1m1-ADI-KLmodes-all.fits"
+    
+        filename = os.path.join(dirpath, pyklip_name)
+        return filename, objname, date, band, mode
 
 
     def craft_response(self, msg, sender, channel):
@@ -222,6 +292,14 @@ print(client.chat.post_message('@jwang', 'Beep. Boop', username=username, as_use
 
 
 
+    
+# Run real time message slack client 
+sc = SlackClient(token)
+
+p = ChatResponder(sc)
+p.daemon = True
+
+
 # Run real time PSF subtraction updater
 print(dropboxdir)
 event_handler = NewImagePoster(dropboxdir, client)
@@ -230,14 +308,6 @@ observer = Observer()
 observer.schedule(event_handler, dropboxdir, recursive=True)
 observer.start()
 
-
-
-    
-# Run real time message slack client 
-sc = SlackClient(token)
-
-p = ChatResponder(sc)
-p.daemon = True
 
 p.start()
 while True:

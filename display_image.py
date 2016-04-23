@@ -1,7 +1,30 @@
+import os
 import matplotlib
 import matplotlib.pylab as plt
 import astropy.io.fits as fits
 import numpy as np
+
+def get_title_from_filename(filename):
+    """
+    Generate title by parsing filename
+    
+    Args:
+        filename: pull path to file
+    Return:
+        title: title to plot
+    """
+    filepath_args = filename.split(os.path.sep)
+    objname = filepath_args[-4]
+    objname = objname.replace("_", " ")
+    dateband = filepath_args[-2].split("_")
+    date = dateband[0]
+    date = "{0}-{1}-{2}".format(date[0:4], date[4:6], date[6:8])
+    band = dateband[1]
+    mode = dateband[2]
+
+    title = "{obj} {date} {band}-{mode}".format(obj=objname, date=date, band=band, mode=mode)
+    return title
+
 
 def save_klcube_image(filename, outputname, title=None):
     """
@@ -53,7 +76,6 @@ def save_klcube_image(filename, outputname, title=None):
     
     ax.set_title(title)
     
-    # plt.show()
     plt.savefig(outputname)
     
     
