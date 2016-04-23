@@ -9,6 +9,7 @@ import threading
 from threading import Thread
 import re
 import os
+import requests
 
 from slackclient import SlackClient
 from slacker import Slacker
@@ -44,6 +45,23 @@ class NewImagePoster(FileSystemEventHandler):
         self.newfiles = []
         self.lock = threading.Lock()
         self.slacker = slacker_bot
+    
+    def get_joke(self):
+        """
+        Get a joke
+        
+        Return:
+            joke: LOL
+        """
+        try:
+            req = requests.get("http://tambal.azurewebsites.net/joke/random")
+            body = req.json()
+            joke = body['joke']
+        except requests.exceptions.RequestException:
+            # Woops, error getting joke
+            joke = None
+        return joke
+        
     
     def process_file(self):
         with self.lock:
