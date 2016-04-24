@@ -45,22 +45,6 @@ class NewImagePoster(FileSystemEventHandler):
         self.newfiles = []
         self.lock = threading.Lock()
         self.slacker = slacker_bot
-    
-    def get_joke(self):
-        """
-        Get a joke
-        
-        Return:
-            joke: LOL
-        """
-        try:
-            req = requests.get("http://tambal.azurewebsites.net/joke/random")
-            body = req.json()
-            joke = body['joke']
-        except requests.exceptions.RequestException:
-            # Woops, error getting joke
-            joke = None
-        return joke
         
     
     def process_file(self):
@@ -226,7 +210,23 @@ class ChatResponder(Thread):
         filename = os.path.join(dirpath, pyklip_name)
         return filename, objname, date, band, mode
 
-
+    def get_joke(self):
+        """
+        Get a joke
+        
+        Return:
+            joke: LOL
+        """
+        try:
+            req = requests.get("http://tambal.azurewebsites.net/joke/random")
+            body = req.json()
+            joke = body['joke']
+        except requests.exceptions.RequestException:
+            # Woops, error getting joke
+            joke = None
+        return joke
+        
+        
     def craft_response(self, msg, sender, channel):
         """
         Given some input text from someone, craft this a response
@@ -271,6 +271,13 @@ class ChatResponder(Thread):
             print(self.slack_client.api_call("chat.postMessage", channel=channel, text=full_reply, username=username, as_user=True))
             # upload image
             print(self.slacker.files.upload('tmp.png', channels="@jwang",filename="{0}.png".format(title.replace(" ", "_")), title=title ).raw)
+        if (msg.upper()[:4] == "TELL"):
+            if ("JOKE" in msg.upper()):
+                joke = self.get_joke()
+                if joke is not None:
+                    full_reply = '<@{user}>: '.format(user=sender) + joke
+                    print(self.slack_client.api_call("chat.postMessage", channel=channel, text=full_reply, username=username, as_user=True))
+ 
             
     def parse_txt(self, msg):
         """
@@ -286,11 +293,16 @@ class ChatResponder(Thread):
         msg = msg.strip()
 
         # see if it's addressed to you
-        if not "<@{id}>".format(id=uid) == msg[:12]:
+        id_str = "<@{id}>".format(id=uid)
+        if not id_str in msg:
             return None
             
+        # assume the text after @Data_Cruncher is what's addressed to it
+        id_index = msg.index(id_str)
+        body_start_index = id_index + len(id_str)    
+            
         # strip off @data_cruncher:
-        body = msg[12:] # strip off @data_cruncher
+        body = msg[body_start_index:] # strip off @data_cruncher
         if body[0] == ":":
             body = body[1:] # strip off : too
         
