@@ -9,7 +9,8 @@ import threading
 from threading import Thread
 import re
 import os
-import requests
+import random
+
 
 from slackclient import SlackClient
 from slacker import Slacker
@@ -122,6 +123,14 @@ class ChatResponder(Thread):
         self.slack_client = slack_bot
         self.slacker = slacker
 
+        self.jokes = []
+        with open("jokes.txt") as jokes_file:
+            for joke in jokes_file.readlines():
+                joke = joke.strip()
+                if len(joke) > 0:
+                    self.jokes.append(joke)
+                    
+                    
     def run(self):
         connected = self.slack_client.rtm_connect()
         if connected:
@@ -255,14 +264,17 @@ class ChatResponder(Thread):
         Return:
             joke: LOL
         """
-        try:
-            req = requests.get("http://tambal.azurewebsites.net/joke/random")
-            body = req.json()
-            joke = body['joke']
-        except requests.exceptions.RequestException:
-            # Woops, error getting joke
-            joke = None
-        return joke
+        random_joke_index = random.randint(0, len(self.jokes)-1)
+        return self.jokes[random_joke_index]
+        
+        # try:
+        #     req = requests.get("http://tambal.azurewebsites.net/joke/random")
+        #     body = req.json()
+        #     joke = body['joke']
+        # except requests.exceptions.RequestException:
+        #     # Woops, error getting joke
+        #     joke = None
+        # return joke
         
         
     def craft_response(self, msg, sender, channel):
