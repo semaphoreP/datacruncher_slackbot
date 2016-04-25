@@ -134,6 +134,60 @@ class ChatResponder(Thread):
         else:
             print("Connection Failed, invalid token?")
     
+
+    def choose_folder(self, folders, date=None, band=None, mode=None):
+        """
+        Given subfolders in an autoreduced directory and some optional specifications,
+        find the best dataset to show
+
+        Args:
+            folders: a list of folders 
+            date: datestring (e.g 20141212)
+            band: e.g. H
+            mode Spec or Pol
+        Return:
+            chosen: chosen folder Name. None is nothing is chosen
+        """
+        # boudnary case of no folders
+        if len(folders) == 0:
+            return None
+
+        # limit by date
+        if date is not None:
+            folders = [folder for folder in folders if "{0}_".format(date) in folder]
+
+        # limit by band
+        if band is not None:
+            folders = [folder for folder in folders if "_{0}_".format(band) in folder]
+
+        # limit by mode
+        if mode is not None:
+            folders = [folder for folder in folders if "_{0}".format(mode) in folder]
+
+        # if more than one, pick a spec dataset in H band preferably. If not, just pick the first
+        if len(folders) > 1:
+            # narrow by spec if Pol not specified
+            if mode is None:
+                spec_folders = [folder for folder in folders if "_{0}".format("Spec") in folder]
+                # if there are spec datsets, let's pick those
+                if len(spec_folders) > 0:
+                    folders = spec_folders
+            # narrow by H band if not specified
+            if band is None:
+                H_folders = [folder for folder in folders if "_{0}_".format("H") in folder]
+                # if there are H datasets, pick those
+                if len(H_folders) > 0:
+                    folders = H_folders
+
+        # now pick the first one if we haven't removed all choices
+        if len(folders) > 0:
+            chosen = folders[0]
+        else:
+            chosen = None
+        return chosen
+
+
+
     def get_klipped_img_info(self, request):
         """
         Get the info for a Klipped image that was requested
@@ -152,8 +206,17 @@ class ChatResponder(Thread):
         
         objname = request_args[0].strip().replace(" ", "_")
    
+        date, band, mode = None, None, None
+        if len(request_args) > 1:
+            date = request_args[1].strip()
+            if len(request_args) > 2:
+                band = request_args[2].strip()
+                if len(request_args) > 3:
+                    mode = request_args[3].strip()
+
         # get object name dropbox path
         auto_dirpath = os.path.join(self.dropboxdir, "GPIDATA", objname, "autoreduced")
+        print(auto_dirpath)
         # make sure folder exists
         if not os.path.isdir(auto_dirpath):
             return None
@@ -163,36 +226,11 @@ class ChatResponder(Thread):
             # no subdirs, uh oh
             return None
 
-        # check how many args are passed in
-        if len(request_args) == 1:
-            datefolder = date_folders[0]
-        else:
-            date = request_args[1]
-            if len(request_args) == 2:
-                date = request_args[1].strip()
-                date_folders = [fname for fname in date_folders if date in fname]
-                if len(date_folders) == 0:
-                    # date is invalid
-                    return None
-                datefolder = date_folders[0]
-            else:
-                band = request_args[2].strip()
-                if len(request_args) ==3:
-                    dateband = "{0}_{1}".format(date, band)
-                    date_folders = [fname for fname in date_folders if date in fname]
-                    if len(date_folders) == 0:
-                        # date/band is invalid
-                        return None
-                    datefolder = date_folders[0]
-                else:
-                    mode = request_args[3].strip()
-                    dateband = "{0}_{1}_{2}".format(date, band, mode)
-                    date_folders = [fname for fname in date_folders if date in fname]
-                    if len(date_folders) == 0:
-                        # date/band is invalid
-                        return None
-                    datefolder = date_folders[0]
-
+        datefolder = self.choose_folder(date_folders, date=date, band=band, mode=mode)
+        if datefolder is None:
+            # couldn't find it
+            return None
+        
 
         dateband = datefolder.split("_")
         date = dateband[0]
@@ -203,12 +241,12 @@ class ChatResponder(Thread):
         if mode == "Spec":
             pyklip_name = "pyklip-S{date}-{band}-k150a9s4m1-KLmodes-all.fits"
         else:
-            pyklip_name = "pyklip-S{date}-{band}-pol-k150a9s1m1-ADI-KLmodes-all.fits"
+            pyklip_name = "pyklip-S{date}-{band}-pol-k100a9s1m1-ADI-KLmodes-all.fits"
     
         pyklip_name = pyklip_name.format(date=date, band=band)
         
         filename = os.path.join(dirpath, pyklip_name)
-        return filename, objname, date, band, mode
+        return filename, objname.replace("_", " "), date, band, mode
 
     def get_joke(self):
         """
@@ -241,7 +279,7 @@ class ChatResponder(Thread):
         """
         if msg is None:
             return
-            
+               
         msg = msg.strip()
         if (msg.upper()[:4] == "SHOW") | (msg.upper()[:7] == "SHOW ME"):
             # Someone wants us to show them something!!
@@ -270,7 +308,8 @@ class ChatResponder(Thread):
             full_reply = '<@{user}>: '.format(user=sender) + reply
             print(self.slack_client.api_call("chat.postMessage", channel=channel, text=full_reply, username=username, as_user=True))
             # upload image
-            print(self.slacker.files.upload('tmp.png', channels="@jwang",filename="{0}.png".format(title.replace(" ", "_")), title=title ).raw)
+            if klip_info is not None:
+                print(self.slacker.files.upload('tmp.png', channels=channel,filename="{0}.png".format(title.replace(" ", "_")), title=title ).raw)
         if (msg.upper()[:4] == "TELL"):
             if ("JOKE" in msg.upper()):
                 joke = self.get_joke()
@@ -357,6 +396,8 @@ sc = SlackClient(token)
 
 p = ChatResponder(dropboxdir, sc, client)
 p.daemon = True
+p.start()
+
 
 
 # Run real time PSF subtraction updater
@@ -364,10 +405,9 @@ print(dropboxdir)
 event_handler = NewImagePoster(dropboxdir, client)
 observer = Observer()
 
-observer.schedule(event_handler, dropboxdir, recursive=True)
+observer.schedule(event_handler, os.path.join(dropboxdir, 'GPIDATA'), recursive=True)
 observer.start()
 
 
-p.start()
 while True:
     time.sleep(100)
