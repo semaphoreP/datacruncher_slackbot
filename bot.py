@@ -42,6 +42,7 @@ class NewImagePoster(FileSystemEventHandler):
         Args:
             dropboxdir: full path to dropboxdir to scan
             slacker_bot: a Slacker instance
+    
         """
         self.dropboxdir = dropboxdir
         self.newfiles = []
@@ -394,7 +395,7 @@ class ChatResponder(Thread):
                 print("Got a malformed message packet", e)
                 return
             
-            print("From {0}@{1}: {2}".format(sender, channel, msg))
+            print(u"From {0}@{1}".format(sender, channel))
             msg_parsed = self.parse_txt(msg)
             self.craft_response(msg_parsed, sender, channel)
 
