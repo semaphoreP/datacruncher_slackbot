@@ -76,7 +76,7 @@ def get_time_now(mytz):
         
     time = datetime.now(tz_from)
 
-    fmt = "%I:%M %p (%Z%z)"
+    fmt = "%I:%M %p (UT%z)"
     return time.strftime(fmt)
     
 
