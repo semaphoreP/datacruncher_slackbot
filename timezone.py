@@ -1,6 +1,8 @@
 from datetime import datetime
 import pytz as tz
+import astropy.time
 
+gemini_longitude = -70 - 44/60. - 12.096/3600
 
 all_timezones = tz.common_timezones
 all_abbreviations = {} # convert from abbreviation to full time zone
@@ -70,6 +72,9 @@ def get_time_now(mytz):
     Args:
         mytz: abbrevation e.g. CLT
     """
+    if mytz.upper() == 'LST':
+        return get_lst(gemini_longitude)
+    
     tz_from = get_timezone(mytz)
     if tz_from is None:
         return None
@@ -78,6 +83,31 @@ def get_time_now(mytz):
 
     fmt = "%I:%M %p (%Z%z)"
     return time.strftime(fmt)
+  
+  
+def get_lst(longitude):
+    """
+    Gets the Local Sidereal Time
+    
+    Args:
+        longitude: decimal degrees (west is negative so longitude ranges from [-180,180])
+    """  
+    t = astropy.time.Time(datetime.utcnow())
+    jd0 = (t.jd-0.5) // 1 + 0.5
+    ut = ((t.jd-0.5) % 1) * 24
+    T=(jd0-2451545.0)/36525.0
+    T0 = 6.697374558+ (2400.051336*T)+(0.000025862*T**2)+(ut*1.0027379093)
+    GST = T0 % 24
+    LST = (GST + longitude/15) % 24
+    
+    LST_hour = LST//1
+    LST_min = (LST % 1) * 60
+    LST_sec = round((LST_min % 1) * 60)
+    LST_min = LST_min // 1
+    LST_str = "%02d:%02d:%02d" % (LST_hour, LST_min, LST_sec)
+    return LST_str
+    
+    
     
 
 # print(get_time_now('PDT'))
