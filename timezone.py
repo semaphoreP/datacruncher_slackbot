@@ -73,7 +73,7 @@ def get_time_now(mytz):
         mytz: abbrevation e.g. CLT
     """
     if mytz.upper() == 'LST':
-        return get_lst(gemini_longitude)
+        return get_lst(gemini_longitude) + " (Gemini South)"
     
     tz_from = get_timezone(mytz)
     if tz_from is None:
