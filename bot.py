@@ -19,6 +19,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
 import display_image
+import timezone
     
 
 # Read in configuration from config.ini
@@ -322,13 +323,23 @@ class ChatResponder(Thread):
             # upload image
             if klip_info is not None:
                 print(self.slacker.files.upload('tmp.png', channels=channel,filename="{0}.png".format(title.replace(" ", "_")), title=title ).raw)
-        if (msg.upper()[:4] == "TELL"):
+        elif (msg.upper()[:4] == "TELL"):
             if ("JOKE" in msg.upper()):
                 joke = self.get_joke()
                 if joke is not None:
                     full_reply = '<@{user}>: '.format(user=sender) + joke
                     print(self.slack_client.api_call("chat.postMessage", channel=channel, text=full_reply, username=username, as_user=True))
  
+        elif (msg.upper()[:4] == 'TIME'):
+            thistz = msg[4:].strip().upper()
+            curr_time = timezone.get_time_now(thistz)
+            if curr_time is not None:
+                time_reply = "The current time in {tz} is: ".format(tz=thistz) + curr_time
+            else:
+                time_reply = "{tz} is not a valid time zone".format(tz=thistz)
+            full_reply = '<@{user}>: '.format(user=sender) + time_reply
+            print(self.slack_client.api_call("chat.postMessage", channel=channel, text=full_reply, username=username, as_user=True))
+                
             
     def parse_txt(self, msg):
         """
