@@ -7,3 +7,4 @@ This is an automated bot to allow the GPIES Data Cruncher chat on Slack.
   * Slacker python library
   * astropy, numpy
   * pyephem
+  * watchdog
