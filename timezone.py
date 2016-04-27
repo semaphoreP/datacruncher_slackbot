@@ -17,23 +17,35 @@ def get_timezone(tz_abbrev):
     Convert form time zone abbrevaiton (3 characeters) to full time zone
     """
     new_tz_abbrev = tz_abbrev
-    # check for daylight savings
-    if tz_abbrev.upper()[1] == 'D':
-        dst = True
-        # check to make sure the lookup is this version
-        # else switch abbreviation to standard time
-        if not tz_abbrev in all_abbreviations:
-            new_tz_abbrev[1] = u'S'
-    else:
-        dst = False
-        # check to make sure the lookup is this version
-        # else switch abbreviation to DST time
-        if not tz_abbrev in all_abbreviations:
-            new_tz_abbrev[1] = u'D'
-    try:    
-        timezone = tz.timezone(all_abbreviations[new_tz_abbrev])
-    except KeyError:
-        timezone = None
+    
+    # correct daylight savings
+    if len(new_tz_abbrev) == 3:
+        # check for daylight savings
+        if new_tz_abbrev.upper()[1] == u'D':
+            dst = True
+            # check to make sure the lookup is this version
+            # else switch abbreviation to standard time
+            if not new_tz_abbrev in all_abbreviations:
+                new_tz_abbrev[1] = u'S'
+        else:
+            dst = False
+            # check to make sure the lookup is this version
+            # else switch abbreviation to DST time
+            if not new_tz_abbrev in all_abbreviations:
+                new_tz_abbrev[1] = u'D'
+    
+    # correct UT to UTC
+    if new_tz_abbrev.upper() == u'UT':
+        new_tz_abbrev = u'UTC'
+    
+    # no need to look up UTC
+    if new_tz_abbrev.upper() == u'UTC':
+        timezone = tz.timezone('UTC')   
+    else:       
+        try:    
+            timezone = tz.timezone(all_abbreviations[new_tz_abbrev])
+        except KeyError:
+            timezone = None
     return timezone
     
 
