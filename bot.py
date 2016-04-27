@@ -20,6 +20,7 @@ from watchdog.events import FileSystemEventHandler
 
 import display_image
 import timezone
+import suntimes
     
 
 # Read in configuration from config.ini
@@ -339,7 +340,14 @@ class ChatResponder(Thread):
                 time_reply = "{tz} is not a valid time zone".format(tz=thistz)
             full_reply = '<@{user}>: '.format(user=sender) + time_reply
             print(self.slack_client.api_call("chat.postMessage", channel=channel, text=full_reply, username=username, as_user=True))
-                
+        elif 'SUNRISE' in msg.upper():
+            time_reply = suntimes.sunrise_time_response()
+            full_reply = '<@{user}>: '.format(user=sender) + time_reply
+            print(self.slack_client.api_call("chat.postMessage", channel=channel, text=full_reply, username=username, as_user=True))
+        elif 'SUNSET' in msg.upper():
+            time_reply = suntimes.sunset_time_response()
+            full_reply = '<@{user}>: '.format(user=sender) + time_reply
+            print(self.slack_client.api_call("chat.postMessage", channel=channel, text=full_reply, username=username, as_user=True))
             
     def parse_txt(self, msg):
         """
