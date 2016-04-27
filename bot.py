@@ -61,8 +61,8 @@ class NewImagePoster(FileSystemEventHandler):
         title = display_image.get_title_from_filename(filepath)
         display_image.save_klcube_image(filepath, "tmp.png", title=title)
         #print(self.slacker.chat.post_message('@jwang', 'Beep. Boop. {0}'.format(filepath), username=username, as_user=True).raw)
-        print(self.slacker.chat.post_message('@jwang', "Beep. Boop. I just finished a PSF Subtraction for {0}. Here's a quicklook image.".format(title), username=username, as_user=True).raw)
-        print(self.slacker.files.upload('tmp.png', channels="@jwang",filename="{0}.png".format(title.replace(" ", "_")), title=title ).raw)
+        print(self.slacker.chat.post_message('#gpies-observing', "Beep. Boop. I just finished a PSF Subtraction for {0}. Here's a quicklook image.".format(title), username=username, as_user=True).raw)
+        print(self.slacker.files.upload('tmp.png', channels="#gpies-observing",filename="{0}.png".format(title.replace(" ", "_")), title=title ).raw)
         return
     
     
@@ -74,7 +74,6 @@ class NewImagePoster(FileSystemEventHandler):
             event: file system event
         """
         filepath = event.src_path
-        print(filepath)
         
         # we are looking for the first PSF subtraction that happens
         if "_Pol" in filepath:
