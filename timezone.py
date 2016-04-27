@@ -23,13 +23,13 @@ def get_timezone(tz_abbrev):
         # check to make sure the lookup is this version
         # else switch abbreviation to standard time
         if not tz_abbrev in all_abbreviations:
-            new_tz_abbrev[1] = 'S'
+            new_tz_abbrev[1] = u'S'
     else:
         dst = False
         # check to make sure the lookup is this version
         # else switch abbreviation to DST time
         if not tz_abbrev in all_abbreviations:
-            new_tz_abbrev[1] = 'D'
+            new_tz_abbrev[1] = u'D'
     try:    
         timezone = tz.timezone(all_abbreviations[new_tz_abbrev])
     except KeyError:
