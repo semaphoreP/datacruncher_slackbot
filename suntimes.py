@@ -85,6 +85,6 @@ def get_current_moon_phase():
     # round to the nearest phase and wrap aroudn for the 7.5-7.9 range mapping to 0
     phase = round(phase) % 8
     
-    return "The current moon phase is {0}".format(moon_phases[phase])
+    return "The current moon phase is {0}".format(moon_phases[int(phase)])
      
     
