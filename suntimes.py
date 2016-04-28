@@ -65,3 +65,26 @@ def sunset_time_response():
             "\nand 12 deg twilight is at {}".format(utc_to_multizone(twitime.datetime()) ) )
 
 
+moon_phases = [ ":new_moon:", ":waxing_crescent_moon:", ":first_quarter_moon:", ":waxing_gibbous_moon:", ":full_moon:", ":waning_gibbous_moon:", ":last_quarter_moon:", ":waning_crescent_moon:"]
+moon_observer = _gemini()
+    
+def get_current_moon_phase():
+    """
+    Get the current moon phase
+    """
+    # get the dates of the last and next new moon
+    moon_observer.date = datetime.now()
+    phase_end = ephem.next_new_moon(moon_observer.date)
+    phase_start = ephem.previous_new_moon(moon_observer.date)
+
+    
+    # based on that figure out what part of the phase we are in. Phase goes from [0,1)
+    phase = (moon_observer.date - phase_start) / (phase_end - phase_start)
+    # 8 moon phases, so do this for easy indexing
+    phase *= 8 
+    # round to the nearest phase and wrap aroudn for the 7.5-7.9 range mapping to 0
+    phase = round(phase) % 8
+    
+    return "The current moon phase is {0}".format(moon_phases[phase])
+     
+    

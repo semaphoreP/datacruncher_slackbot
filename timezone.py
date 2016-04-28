@@ -79,13 +79,16 @@ def convert_time(time_str, zone_from, zone_to):
 
 def get_time_now(mytz):
     """
-    Get current time in this time zone
+    Get current time in this time zone.  Also supports LST, JD, and MJD
     
     Args:
         mytz: abbrevation e.g. CLT
     """
     if mytz.upper() == 'LST':
         return get_lst(gemini_longitude) + " (Gemini South)"
+    
+    if mytz.upper() == 'JD'or mytz.upper() == 'MJD':
+        return get_jd(modified=('M' in mytz.upper()))
     
     tz_from = get_timezone(mytz)
     if tz_from is None:
@@ -120,7 +123,19 @@ def get_lst(longitude):
     return LST_str
     
     
+def get_jd(modified=True):
+    """
+    Gets the JD or MJD
     
+    Args:
+        modified: if True, get MJD instead
+    """
+    t = astropy.time.Time(datetime.utcnow())
+    jd = t.jd
+    if modified:
+        jd -= 2400000.5
+        
+    return "{0:.5f}".format(jd)
 
 # print(get_time_now('PDT'))
 # print(get_time_now('CLT'))

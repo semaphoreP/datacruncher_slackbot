@@ -348,7 +348,13 @@ class ChatResponder(Thread):
             time_reply = suntimes.sunset_time_response()
             full_reply = '<@{user}>: '.format(user=sender) + time_reply
             print(self.slack_client.api_call("chat.postMessage", channel=channel, text=full_reply, username=username, as_user=True))
+        elif 'MOON' == msg.upper() or 'MOON PHASE' in msg.upper():
+            moon_phase = suntimes.get_current_moon_phase()
+            full_reply = '<@{user}>: '.format(user=sender) + moon_phase
+            print(self.slack_client.api_call("chat.postMessage", channel=channel, text=full_reply, username=username, as_user=True))
             
+            
+           
     def parse_txt(self, msg):
         """
         Parse text someone sent to the Data Cruncher
