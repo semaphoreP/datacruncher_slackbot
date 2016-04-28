@@ -379,9 +379,10 @@ class ChatResponder(Thread):
             
         # strip off @data_cruncher:
         body = msg[body_start_index:] # strip off @data_cruncher
-        if body[0] == ":":
-            body = body[1:] # strip off : too
-        
+        if len(body) == 0: # nothing to see here
+            return None
+        if body[0] == ":":  # strip off : if it exists
+            body = body[1:]        
         parsed = body
         
         return parsed
@@ -410,7 +411,11 @@ class ChatResponder(Thread):
             
             print(u"From {0}@{1}".format(sender, channel))
             msg_parsed = self.parse_txt(msg)
-            self.craft_response(msg_parsed, sender, channel)
+            try:
+                self.craft_response(msg_parsed, sender, channel)
+            except IndexError:
+                # woops, message was too short we index errored
+                retrun
 
 
 
