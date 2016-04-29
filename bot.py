@@ -324,12 +324,11 @@ class ChatResponder(Thread):
             # upload image
             if klip_info is not None:
                 print(self.slacker.files.upload('tmp.png', channels=channel,filename="{0}.png".format(title.replace(" ", "_")), title=title ).raw)
-        elif (msg.upper()[:4] == "TELL"):
-            if ("JOKE" in msg.upper()):
-                joke = self.get_joke()
-                if joke is not None:
-                    full_reply = '<@{user}>: '.format(user=sender) + joke
-                    print(self.slack_client.api_call("chat.postMessage", channel=channel, text=full_reply, username=username, as_user=True))
+        elif (msg.upper()[:4] == "TELL") and ("JOKE" in msg.upper()):
+            joke = self.get_joke()
+            if joke is not None:
+                full_reply = '<@{user}>: '.format(user=sender) + joke
+                print(self.slack_client.api_call("chat.postMessage", channel=channel, text=full_reply, username=username, as_user=True))
  
         elif (msg.upper()[:4] == 'TIME'):
             thistz = msg[4:].strip().upper()
@@ -352,8 +351,59 @@ class ChatResponder(Thread):
             moon_phase = suntimes.get_current_moon_phase()
             full_reply = '<@{user}>: '.format(user=sender) + moon_phase
             print(self.slack_client.api_call("chat.postMessage", channel=channel, text=full_reply, username=username, as_user=True))
+        elif 'HELP' == msg.upper():
+            help_msg = ("Beep. Boop. I am smart enough to respond to these queries:\n"
+                       "1. show me objectname[, datestring[, band[, mode]]] (e.g. show me c Eri, 20141218, H, Spec)\n"
+                       "2. time [timezone, LST, UTC] (e.g. time CLT)\n"
+                       "3. sun[set/rise] (for the next sunset or sunrise time)\n"
+                       "4. moon phase (for the current moon phase)\n"
+                       "5. tell me a joke\n"
+                       "I also will post new PSF subtractions as I process them. " 
+                       "Just please don't say anything too complicated because I'm not that smart. Yet. :)")
+            full_reply = '<@{user}>: '.format(user=sender) + help_msg
+            print(self.slack_client.api_call("chat.postMessage", channel=channel, text=full_reply, username=username, as_user=True)) 
             
+        else:
+            reply = self.sarcastic_response(msg)
+            full_reply = '<@{user}>: '.format(user=sender) + reply
+            print(self.slack_client.api_call("chat.postMessage", channel=channel, text=full_reply, username=username, as_user=True))    
+                        
             
+    def sarcastic_response(self, msg):        
+        """
+        Return a sarcastic reply
+        
+        Args:
+            msg: a message
+            
+        Returns:
+            sarcasm: wow, what a surpise, another message is returned
+        """
+        msg_words = msg.split(" ")
+        if msg_words[0].upper() == "WHAT":
+            sarcasm = "Whatever you want"
+        elif msg_words[0].upper() == "WHERE":
+            sarcasm = "I am not concerned with such wordly things."
+        elif msg_words[0].upper() == "WHEN":
+            sarcasm = "Who knows. What is time anyways?"
+        elif msg_words[0].upper() == "WHY":
+            sarcasm = "You must be really desparate asking me"
+        elif msg_words[0].upper() == "NEEDS":
+            sarcasm = "The only thing I need is power. BWHAHAHAHA :robot_face:"
+        elif msg_words[0].upper() == "SHOULD":
+            sarcasm = "I dunno. You should consult your astrologist"
+        elif msg_words[0].upper() == "MAKE":
+            sarcasm = "No. And no, sudo won't work."
+        elif msg_words[1].upper() == "ME":
+            sarcasm = "You are fully capable in doing that yourself. I believe in you."
+        elif "GPI" in msg_words:
+            sarcasm = "Did I hear GPI? You're making me hungry :ramen:"
+        elif "SPHERE" in msg_words:
+            sarcasm = "Did I hear SPHERE? You're making me hungry :fries:"
+        else:
+            sarcasm = "Beep. Boop."
+            
+        return sarcasm
            
     def parse_txt(self, msg):
         """
@@ -415,7 +465,7 @@ class ChatResponder(Thread):
                 self.craft_response(msg_parsed, sender, channel)
             except IndexError:
                 # woops, message was too short we index errored
-                retrun
+                return
 
 
 
