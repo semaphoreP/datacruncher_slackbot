@@ -380,11 +380,8 @@ class ChatResponder(Thread):
             sarcasm: wow, what a surpise, another message is returned
         """
         msg_words = msg.upper().split(" ")
-        if msg_words[0].upper() == "WHAT" or "WHAT" in msg_words[0].split("'"):
-            sarcasm = "Whatever you want"
-            if "HUMAN" in msg.upper():
-                sarcasm = "I'm sorry, but you don't really want to know that."
-        elif msg_words[0].upper() == "WHO" or "WHO" in msg_words[0].split("'"):
+
+        if msg_words[0].upper() == "WHO" or "WHO" in msg_words[0].split("'"):
             sarcasm = "Certainly not me!"
             if "IS" in msg_words[2:] or "BE" in msg_words[2:] or "ARE" in msg_words[2:]:
                 sarcasm = "I choose you!"
@@ -406,6 +403,10 @@ class ChatResponder(Thread):
             sarcasm = "Did I hear GPI? You're making me hungry :ramen:"
         elif "SPHERE" in msg_words:
             sarcasm = "Did I hear SPHERE? You're making me hungry :fries:"
+        elif msg_words[0].upper() == "WHAT" or "WHAT" in msg_words[0].split("'"):
+            sarcasm = "Whatever you want"
+            if "HUMAN" in msg.upper():
+                sarcasm = "I'm sorry, but you don't really want to know that."
         else:
             sarcasm = "Beep. Boop."
             
