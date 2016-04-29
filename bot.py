@@ -379,9 +379,15 @@ class ChatResponder(Thread):
         Returns:
             sarcasm: wow, what a surpise, another message is returned
         """
-        msg_words = msg.split(" ")
-        if msg_words[0].upper() == "WHAT":
+        msg_words = msg.upper().split(" ")
+        if msg_words[0].upper() == "WHAT" or "WHAT" in msg_words[0].split("'"):
             sarcasm = "Whatever you want"
+            if "HUMAN" in msg.upper():
+                sarcasm = "I'm sorry, but you don't really want to know that."
+        elif msg_words[0].upper() == "WHO" or "WHO" in msg_words[0].split("'"):
+            sarcasm = "Certainly not me!"
+            if "IS" in msg_words[2:] or "BE" in msg_words[2:] or "ARE" in msg_words[2:]:
+                sarcasm = "I choose you!"
         elif msg_words[0].upper() == "WHERE":
             sarcasm = "I am not concerned with such wordly things."
         elif msg_words[0].upper() == "WHEN":
