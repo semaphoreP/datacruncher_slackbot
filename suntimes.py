@@ -39,7 +39,7 @@ gemsouth_twi.horizon='-12'
 def delta_to_now(sometime):
     deltat = (sometime - ephem.now()) # in days
     delta_hour = int(np.floor(deltat*24))
-    delta_min = int(np.round((deltat-delta_hour/24)*24*60))
+    delta_min = int(np.round((deltat-delta_hour/24.)*24*60))
     return delta_hour,delta_min
 
 
