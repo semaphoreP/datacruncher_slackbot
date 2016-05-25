@@ -10,7 +10,7 @@ from threading import Thread
 import re
 import os
 import random
-
+from websocket import WebSocketConnectionClosedException
 
 from slackclient import SlackClient
 from slacker import Slacker
@@ -135,13 +135,22 @@ class ChatResponder(Thread):
                     
     def run(self):
         connected = self.slack_client.rtm_connect()
-        if connected:
-            while True:
+        if not connected:
+            print("Connection Failed, invalid token?")
+            return
+
+        while connected:
+            try:
                 events = self.slack_client.rtm_read()
-                for event in events:
-                    self.parse_event(event)
+            except WebSocketConnectionClosedException as e:
+                #couldn't connect. Try to reconnect...
+                connected = self.slack_client.rtm_connect()
+                continue
+
+            for event in events:
+                self.parse_event(event)
                         
-                time.sleep(1)
+            time.sleep(1)
         else:
             print("Connection Failed, invalid token?")
     
