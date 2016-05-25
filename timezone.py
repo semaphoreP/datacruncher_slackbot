@@ -26,13 +26,13 @@ def get_timezone(tz_abbrev):
             # check to make sure the lookup is this version
             # else switch abbreviation to standard time
             if not new_tz_abbrev in all_abbreviations:
-                new_tz_abbrev[1] = u'S'
+                new_tz_abbrev = new_tz_abbrev[0] + u'S' + new_tz_abbrev[2]
         else:
             dst = False
             # check to make sure the lookup is this version
             # else switch abbreviation to DST time
             if not new_tz_abbrev in all_abbreviations:
-                new_tz_abbrev[1] = u'D'
+                new_tz_abbrev = new_tz_abbrev[0] + u'D' + new_tz_abbrev[2]
     
     # correct UT to UTC
     if new_tz_abbrev.upper() == u'UT':
