@@ -10,6 +10,10 @@ for zone in all_timezones:
     abbrev = tz.timezone(zone).localize(datetime.now()).strftime('%Z')
     if abbrev == 'CLT' and 'Santiago' not in zone:
         continue
+    if abbrev == 'CLST' and 'Santiago' not in zone:
+        continue
+    if abbrev == 'CLDT' and 'Santiago' not in zone:
+        continue
     all_abbreviations[abbrev] = zone
 
 def get_timezone(tz_abbrev):
