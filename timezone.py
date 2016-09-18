@@ -12,8 +12,6 @@ for zone in all_timezones:
         continue
     if abbrev == 'CLST' and 'Santiago' not in zone:
         continue
-    if abbrev == 'CLDT' and 'Santiago' not in zone:
-        continue
     all_abbreviations[abbrev] = zone
 
 def get_timezone(tz_abbrev):
