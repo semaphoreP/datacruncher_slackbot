@@ -11,6 +11,7 @@ import re
 import os
 import random
 from websocket import WebSocketConnectionClosedException
+import socket
 
 from slackclient import SlackClient
 from slacker import Slacker
@@ -142,7 +143,7 @@ class ChatResponder(Thread):
         while connected:
             try:
                 events = self.slack_client.rtm_read()
-            except WebSocketConnectionClosedException as e:
+            except (WebSocketConnectionClosedException, socket.timeout) as e:
                 #couldn't connect. Try to reconnect...
                 connected = self.slack_client.rtm_connect()
                 continue
