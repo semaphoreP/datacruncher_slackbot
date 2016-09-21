@@ -8,6 +8,7 @@ This is an automated bot to allow the GPIES Data Cruncher chat on Slack.
   * astropy, numpy
   * pyephem
   * watchdog
+  * websocket-client
 
 ### Setup
 You need to make a `config.ini` file that populates the same fields as `config.ini.deafult`. The token can be obtained from Slack. The username requires parsing a chat message received with the Slack API that has @data_cruncher in the message. In the message, @data_cruncher will be replaced with @(some characters) and (some characters) is actually the chat it.
