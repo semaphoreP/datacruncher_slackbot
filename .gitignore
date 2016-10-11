@@ -3,6 +3,8 @@ config.ini
 
 # temp files
 tmp.png
+tmp0.png
+tmp1.png
 
 # vscode iles
 .vscode/

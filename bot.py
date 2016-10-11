@@ -5,13 +5,15 @@ if sys.version_info < (3,0):
 else:
     import configparser
 import time
+import queue
 import threading
-from threading import Thread
+from threading import Thread, Lock, Condition
 import re
 import os
 import random
-from websocket import WebSocketConnectionClosedException
 import socket
+from websocket import WebSocketConnectionClosedException
+
 
 from slackclient import SlackClient
 from slacker import Slacker
@@ -33,6 +35,44 @@ token = config.get('DEFAULT', 'token')
 uid = config.get('DEFAULT', 'id')
 dropboxdir = os.path.normpath(config.get('DEFAULT', 'dropboxdir'))
 
+# locks for plotting thread
+plotlock = Lock()
+notify_plotter = Condition(plotlock) # condition for the plotter to wait on
+notify_customers = Condition(plotlock) # condition for those waiting for plots to be produced to wait on
+plotqueue = queue.Queue() # first slot for NewImagePoster, second slot for ChatResponder
+completed_job_flag = [False, False] # Let's them know whose job has finished. 0 for NewImagerPoster, 1 for ChatRespodner. 
+
+class Plotter(Thread):
+    """
+    Because Matplotlib can only be called from a single python thread in a process..
+
+    Writes all images to tmp.png
+    """
+    def __init__(self):
+        """
+        Creates a plotter thread
+        """
+        super(Plotter, self).__init__()
+        self.daemon = True
+        self.nextindex = 0 # alternate between 0 and 1 so no one thread hogs the plotter
+
+    def run(self):
+        # infinite loop
+        while True:
+            with plotlock:
+                # wait for a job
+                while plotqueue.empty():
+                    notify_plotter.wait()
+                # I have a job
+                jobargs = plotqueue.get()
+                job_number = jobargs[0] # 0 for NewImagerPoster, 1 for ChatResponder
+                filepath = jobargs[1] # path to FITS file to be plotted
+                title = display_image.get_title_from_filename(filepath) # parser title from filepath
+                display_image.save_klcube_image(filepath, "tmp{0}.png".format(job_number), title=title) # plot iter
+
+                completed_job_flag[job_number] = True # set the completed job flag
+                notify_customers.notify_all()
+
 class NewImagePoster(FileSystemEventHandler):
     """
     Thread that posts new PSF subtracted images to the Slack Chat
@@ -50,6 +90,7 @@ class NewImagePoster(FileSystemEventHandler):
         self.newfiles = []
         self.lock = threading.Lock()
         self.slacker = slacker_bot
+        self.job_number = 0 # 0 for NewImagerPoster, 1 for ChatResponder
         
     
     def process_file(self):
@@ -61,10 +102,24 @@ class NewImagePoster(FileSystemEventHandler):
             
         # get title and make image after getting new klip file
         title = display_image.get_title_from_filename(filepath)
-        display_image.save_klcube_image(filepath, "tmp.png", title=title)
+        #display_image.save_klcube_image(filepath, "tmp.png", title=title)
         #print(self.slacker.chat.post_message('@jwang', 'Beep. Boop. {0}'.format(filepath), username=username, as_user=True).raw)
+
+        # send job to plotter to get plotted
+        with plotlock:
+            # construct the job arguments
+            job_args = (self.job_number, filepath)
+            plotqueue.put(job_args)
+            completed_job_flag[self.job_number] = False
+            # ask the plotter to do its job
+            notify_plotter.notify()
+            # wait for job to finish
+            while not completed_job_flag[self.job_number]:
+                notify_customers.wait()
+            # horray job is finished!
+
         print(self.slacker.chat.post_message('#gpies-observing', "Beep. Boop. I just finished a PSF Subtraction for {0}. Here's a quicklook image.".format(title), username=username, as_user=True).raw)
-        print(self.slacker.files.upload('tmp.png', channels="#gpies-observing",filename="{0}.png".format(title.replace(" ", "_")), title=title ).raw)
+        print(self.slacker.files.upload('tmp{0}.png'.format(self.job_number), channels="#gpies-observing",filename="{0}.png".format(title.replace(" ", "_")), title=title ).raw)
         return
     
     
@@ -126,6 +181,8 @@ class ChatResponder(Thread):
         self.slack_client = slack_bot
         self.slacker = slacker
 
+        self.job_number = 1 # 0 for NewImagerPoster, 1 for ChatResponder
+
         self.jokes = []
         with open("jokes.txt") as jokes_file:
             for joke in jokes_file.readlines():
@@ -143,7 +200,7 @@ class ChatResponder(Thread):
         while connected:
             try:
                 events = self.slack_client.rtm_read()
-            except (WebSocketConnectionClosedException, socket.timeout) as e:
+            except (WebSocketConnectionClosedException, socket.timeout):
                 #couldn't connect. Try to reconnect...
                 connected = self.slack_client.rtm_connect()
                 continue
@@ -278,15 +335,7 @@ class ChatResponder(Thread):
         """
         random_joke_index = random.randint(0, len(self.jokes)-1)
         return self.jokes[random_joke_index]
-        
-        # try:
-        #     req = requests.get("http://tambal.azurewebsites.net/joke/random")
-        #     body = req.json()
-        #     joke = body['joke']
-        # except requests.exceptions.RequestException:
-        #     # Woops, error getting joke
-        #     joke = None
-        # return joke
+
 
     def beepboop(self):
         """ Random robot noises"""
@@ -337,14 +386,27 @@ class ChatResponder(Thread):
                 
                 # generate image to upload
                 title = display_image.get_title_from_filename(pyklip_filename)
-                display_image.save_klcube_image(pyklip_filename, "tmp.png", title=title)
+                # display_image.save_klcube_image(pyklip_filename, "tmp.png", title=title)
+                
+                # send job to plotter to get plotted
+                with plotlock:
+                    # construct the job arguments
+                    job_args = (self.job_number, pyklip_filename)
+                    plotqueue.put(job_args)
+                    completed_job_flag[self.job_number] = False
+                    # ask the plotter to do its job
+                    notify_plotter.notify()
+                    # wait for job to finish
+                    while not completed_job_flag[self.job_number]:
+                        notify_customers.wait()
+                    # horray job is finished!
                 
             # generate and send reply
             full_reply = '<@{user}>: '.format(user=sender) + reply
             print(self.slack_client.api_call("chat.postMessage", channel=channel, text=full_reply, username=username, as_user=True))
             # upload image
             if klip_info is not None:
-                print(self.slacker.files.upload('tmp.png', channels=channel,filename="{0}.png".format(title.replace(" ", "_")), title=title ).raw)
+                print(self.slacker.files.upload('tmp{0}.png'.format(self.job_number), channels=channel,filename="{0}.png".format(title.replace(" ", "_")), title=title ).raw)
         elif (msg.upper()[:4] == "TELL") and ("JOKE" in msg.upper()):
             joke = self.get_joke()
             if joke is not None:
@@ -508,7 +570,9 @@ client = Slacker(token)
 print(client.chat.post_message('@jwang', 'Beep. Boop.', username=username, as_user=True).raw)
 # print(client.files.upload('tmp.png', channels="@jwang",filename="HD_95086_160229_H_Spec.png", title="HD 95086 2016-02-29 H-Spec" ).raw)
 
-
+# start up plotting thread
+plotter = Plotter()
+plotter.start()
 
     
 # Run real time message slack client 
