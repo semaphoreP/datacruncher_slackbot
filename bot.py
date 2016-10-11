@@ -11,6 +11,7 @@ import re
 import os
 import random
 from websocket import WebSocketConnectionClosedException
+import socket
 
 from slackclient import SlackClient
 from slacker import Slacker
@@ -142,7 +143,7 @@ class ChatResponder(Thread):
         while connected:
             try:
                 events = self.slack_client.rtm_read()
-            except WebSocketConnectionClosedException as e:
+            except (WebSocketConnectionClosedException, socket.timeout) as e:
                 #couldn't connect. Try to reconnect...
                 connected = self.slack_client.rtm_connect()
                 continue
@@ -286,7 +287,18 @@ class ChatResponder(Thread):
         #     # Woops, error getting joke
         #     joke = None
         # return joke
-        
+
+    def beepboop(self):
+        """ Random robot noises"""
+        num = random.random()
+        if num < 0.8:
+            return "Beep. Boop."
+        elif num < 0.98:
+            return "Boop. Beep."
+        elif num < 0.999:
+            return "Whirrrr. Buzz."
+        else:
+            return "*[screechy modem noises]*"
         
     def craft_response(self, msg, sender, channel):
         """
@@ -316,12 +328,12 @@ class ChatResponder(Thread):
             # get requested pyklip reduction by parsing message
             klip_info = self.get_klipped_img_info(msg)
             if klip_info is None:
-                reply = "Beep. Boop. I'm sorry, but I couldn't find the data you requested"
+                reply = self.beepboop()+" I'm sorry, but I couldn't find the data you requested"
             else:
                 # found it. Let's get the details of the request
                 pyklip_filename, objname, date, band, mode = klip_info
                 
-                reply = 'Beep. Boop. Retrieving {obj} taken on {date} in {band}-{mode}...'.format(obj=objname, date=date, band=band, mode=mode)
+                reply = self.beepboop()+' Retrieving {obj} taken on {date} in {band}-{mode}...'.format(obj=objname, date=date, band=band, mode=mode)
                 
                 # generate image to upload
                 title = display_image.get_title_from_filename(pyklip_filename)
@@ -361,7 +373,7 @@ class ChatResponder(Thread):
             full_reply = '<@{user}>: '.format(user=sender) + moon_phase
             print(self.slack_client.api_call("chat.postMessage", channel=channel, text=full_reply, username=username, as_user=True))
         elif 'HELP' == msg.upper():
-            help_msg = ("Beep. Boop. I am smart enough to respond to these queries:\n"
+            help_msg = (self.beepboop()+" I am smart enough to respond to these queries:\n"
                        "1. show me objectname[, datestring[, band[, mode]]] (e.g. show me c Eri, 20141218, H, Spec)\n"
                        "2. time [timezone, LST, UTC] (e.g. time CLT)\n"
                        "3. sun[set/rise] (for the next sunset or sunrise time)\n"
@@ -417,7 +429,7 @@ class ChatResponder(Thread):
             if "HUMAN" in msg.upper():
                 sarcasm = "I'm sorry, but you don't really want to know that."
         else:
-            sarcasm = "Beep. Boop."
+            sarcasm = self.beepboop()
             
         return sarcasm
            
