@@ -197,6 +197,8 @@ class ChatResponder(Thread):
 
         self.job_number = 1 # 0 for NewImagerPoster, 1 for ChatResponder
 
+        self.llp_channel = 'C2N6953GP'
+
         self.jokes = []
         with open("jokes.txt") as jokes_file:
             for joke in jokes_file.readlines():
@@ -280,12 +282,13 @@ class ChatResponder(Thread):
 
 
 
-    def get_klipped_img_info(self, request):
+    def get_klipped_img_info(self, request, is_llp):
         """
         Get the info for a Klipped image that was requested
         
         Args:
             request: a string in the form of "Object Name[, Date[, Band[, Mode]]]"
+            is_llp: if we are looking for LLP data
             
         Returns:
             filename: the full path to the klipped image
@@ -306,8 +309,13 @@ class ChatResponder(Thread):
                 if len(request_args) > 3:
                     mode = request_args[3].strip()
 
+        # configure whether LLP data or not
+        if is_llp:
+            GPIDATA_str = "GPIDATA-LLP"
+        else:
+            GPIDATA_str = "GPIDATA"
         # get object name dropbox path
-        auto_dirpath = os.path.join(self.dropboxdir, "GPIDATA", objname, "autoreduced")
+        auto_dirpath = os.path.join(self.dropboxdir, GPIDATA_str, objname, "autoreduced")
         print(auto_dirpath)
         # make sure folder exists
         if not os.path.isdir(auto_dirpath):
@@ -331,7 +339,11 @@ class ChatResponder(Thread):
  
         dirpath = os.path.join(auto_dirpath,  "{0}_{1}_{2}".format(date, band, mode))
         if mode == "Spec":
-            pyklip_name = "pyklip-S{date}-{band}-k150a9s4m1-KLmodes-all.fits"
+            # in Spec, LLP has a different reduction set
+            if is_llp:
+                pyklip_name = "pyklip-S{date}-{band}-k50a9s1m1-nohp-ADI-KLmodes-all.fits"
+            else:
+                pyklip_name = "pyklip-S{date}-{band}-k150a9s4m1-KLmodes-all.fits"
         else:
             pyklip_name = "pyklip-S{date}-{band}-pol-k100a9s1m1-ADI-KLmodes-all.fits"
     
@@ -389,7 +401,9 @@ class ChatResponder(Thread):
             msg = msg.strip()
             
             # get requested pyklip reduction by parsing message
-            klip_info = self.get_klipped_img_info(msg)
+            # check if LLP
+            is_llp_data = channel.upper() == self.llp_channel.upper()
+            klip_info = self.get_klipped_img_info(msg, is_llp_data)
             if klip_info is None:
                 reply = self.beepboop()+" I'm sorry, but I couldn't find the data you requested"
             else:
