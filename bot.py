@@ -40,7 +40,7 @@ plotlock = Lock()
 notify_plotter = Condition(plotlock) # condition for the plotter to wait on
 notify_customers = Condition(plotlock) # condition for those waiting for plots to be produced to wait on
 plotqueue = queue.Queue() # first slot for NewImagePoster, second slot for ChatResponder
-completed_job_flag = [False, False] # Let's them know whose job has finished. 0 for NewImagerPoster, 1 for ChatRespodner. 
+completed_job_flag = [False, False], False # Let's them know whose job has finished. 0 for NewImagerPoster, 1 for ChatRespodner. 
 
 class Plotter(Thread):
     """
@@ -77,20 +77,23 @@ class NewImagePoster(FileSystemEventHandler):
     """
     Thread that posts new PSF subtracted images to the Slack Chat
     """
-    def __init__(self, dropboxdir, slacker_bot):
+    def __init__(self, dropboxdir, slacker_bot, bot_id, is_llp=False):
         """
         Runs on creation
         
         Args:
             dropboxdir: full path to dropboxdir to scan
             slacker_bot: a Slacker instance
+            bot_id: a unique bot_id number to be used to index into the appropriate completed_job_flag
+            is_llp: if True, monitors disk LLP data instead
     
         """
         self.dropboxdir = dropboxdir
         self.newfiles = []
         self.lock = threading.Lock()
         self.slacker = slacker_bot
-        self.job_number = 0 # 0 for NewImagerPoster, 1 for ChatResponder
+        self.job_number = bot_id # 0 for NewImagerPoster, 1 for ChatResponder, 2 for NewImagePoster-LLP
+        self.is_llp = is_llp
         
     
     def process_file(self):
@@ -117,9 +120,14 @@ class NewImagePoster(FileSystemEventHandler):
             while not completed_job_flag[self.job_number]:
                 notify_customers.wait()
             # horray job is finished!
+        
+        if self.is_llp:
+            channel = "#llp"
+        else:
+            channel = "#gpies-observing"
 
-        print(self.slacker.chat.post_message('#gpies-observing', "Beep. Boop. I just finished a PSF Subtraction for {0}. Here's a quicklook image.".format(title), username=username, as_user=True).raw)
-        print(self.slacker.files.upload('tmp{0}.png'.format(self.job_number), channels="#gpies-observing",filename="{0}.png".format(title.replace(" ", "_")), title=title ).raw)
+        print(self.slacker.chat.post_message(channel, "Beep. Boop. I just finished a PSF Subtraction for {0}. Here's a quicklook image.".format(title), username=username, as_user=True).raw)
+        print(self.slacker.files.upload('tmp{0}.png'.format(self.job_number), channels=channel,filename="{0}.png".format(title.replace(" ", "_")), title=title ).raw)
         return
     
     
@@ -134,9 +142,15 @@ class NewImagePoster(FileSystemEventHandler):
         
         # we are looking for the first PSF subtraction that happens
         if "_Pol" in filepath:
+            # for pol, doens't matter if campaign or LLP
             matches = re.findall(r".*m1-(ADI-)?KLmodes-all\.fits", filepath)
-        else:    
-            matches = re.findall(r".*m1-KLmodes-all\.fits", filepath)
+        else: 
+            # spec mode
+            if self.is_llp:
+                matches = re.findall(r".*m1-(nohp-)?(ADI-)?KLmodes-all\.fits", filepath)
+            else:
+                # just regular campaign
+                matches = re.findall(r".*m1-KLmodes-all\.fits", filepath)
         # not a PSF subtraction
         if len(matches) <= 0:
             return
@@ -586,10 +600,15 @@ p.start()
 
 # Run real time PSF subtraction updater
 print(dropboxdir)
-event_handler = NewImagePoster(dropboxdir, client)
+event_handler = NewImagePoster(dropboxdir, client, 0)
 observer = Observer()
-
 observer.schedule(event_handler, os.path.join(dropboxdir, 'GPIDATA'), recursive=True)
+observer.start()
+
+print(dropboxdir)
+event_handler = NewImagePoster(dropboxdir, client, 2, is_llp=True)
+observer = Observer()
+observer.schedule(event_handler, os.path.join(dropboxdir, 'GPIDATA-LLP'), recursive=True)
 observer.start()
 
 
