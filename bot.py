@@ -2,10 +2,11 @@ import sys
 if sys.version_info < (3,0):
     #python 2.7 behavior
     import ConfigParser as configparser
+    import Queue as queue
 else:
     import configparser
+    import queue
 import time
-import queue
 import threading
 from threading import Thread, Lock, Condition
 import re
