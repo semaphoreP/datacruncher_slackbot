@@ -41,7 +41,7 @@ plotlock = Lock()
 notify_plotter = Condition(plotlock) # condition for the plotter to wait on
 notify_customers = Condition(plotlock) # condition for those waiting for plots to be produced to wait on
 plotqueue = queue.Queue() # first slot for NewImagePoster, second slot for ChatResponder
-completed_job_flag = [False, False], False # Let's them know whose job has finished. 0 for NewImagerPoster, 1 for ChatRespodner. 
+completed_job_flag = [False, False, False] # Let's them know whose job has finished. 0 for NewImagerPoster, 1 for ChatRespodner. 
 
 class Plotter(Thread):
     """
@@ -58,6 +58,7 @@ class Plotter(Thread):
         self.nextindex = 0 # alternate between 0 and 1 so no one thread hogs the plotter
 
     def run(self):
+        global completed_job_flag
         # infinite loop
         while True:
             with plotlock:
@@ -98,6 +99,7 @@ class NewImagePoster(FileSystemEventHandler):
         
     
     def process_file(self):
+        global completed_job_flag
         with self.lock:
             if len(self.newfiles) == 0:
                 return
@@ -344,7 +346,12 @@ class ChatResponder(Thread):
             if is_llp:
                 pyklip_name = "pyklip-S{date}-{band}-k50a9s1m1-nohp-ADI-KLmodes-all.fits"
             else:
-                pyklip_name = "pyklip-S{date}-{band}-k150a9s4m1-KLmodes-all.fits"
+                # new pyklip reductions
+                pyklip_name = "pyklip-S{date}-{band}-k300a9s4m1-KLmodes-all.fits"
+                # if they don't exist for this dataset, default to old ones
+                if not os.path.exists(os.path.join(dirpath, pyklip_name.format(date=date, band=band))):
+                    pyklip_name = "pyklip-S{date}-{band}-k150a9s4m1-KLmodes-all.fits"
+                    
         else:
             pyklip_name = "pyklip-S{date}-{band}-pol-k100a9s1m1-ADI-KLmodes-all.fits"
     
@@ -388,6 +395,7 @@ class ChatResponder(Thread):
         Return:
             
         """
+        global completed_job_flag
         if msg is None:
             return
                
@@ -620,11 +628,10 @@ observer = Observer()
 observer.schedule(event_handler, os.path.join(dropboxdir, 'GPIDATA'), recursive=True)
 observer.start()
 
-print(dropboxdir)
-event_handler = NewImagePoster(dropboxdir, client, 2, is_llp=True)
-observer = Observer()
-observer.schedule(event_handler, os.path.join(dropboxdir, 'GPIDATA-LLP'), recursive=True)
-observer.start()
+event_handler_llp = NewImagePoster(dropboxdir, client, 2, is_llp=True)
+observer_llp = Observer()
+observer_llp.schedule(event_handler_llp, os.path.join(dropboxdir, 'GPIDATA-LLP'), recursive=True)
+observer_llp.start()
 
 
 while True:
