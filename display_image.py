@@ -42,6 +42,7 @@ def save_klcube_image(filename, outputname, title=None):
     hdulist = fits.open(filename)
     klcube = hdulist[1].data
     frame50 = klcube[3]
+    band = hdulist[0].header['IFSFILT'].split("_")[1]
     hdulist.close()
     
     # rough throuhghput calibration
@@ -54,8 +55,18 @@ def save_klcube_image(filename, outputname, title=None):
     # make strictly positive for log stretch
     minval = np.nanmin(frame50) - 1
     log_frame = np.log(frame50 - minval)
+
+    # use statistics only from the middle of the image
+    y,x = np.indices(frame50.shape)
+    r = np.sqrt((x-140)**2 + (y-140)**2)
+    
+    if band =='J' or band =='Y':
+        innerradii = 100
+    else:
+        innerradii = 80
+    innerregion = np.where((r < innerradii))
        
-    limits = [-3.e-7, np.min([np.nanpercentile(frame50, 99.6), 8.e-5])]
+    limits = [-3.e-7, np.min([np.nanpercentile(frame50[innerregion], 99.9), 8.e-5])]
     
     # set colormap to have nans as black
     cmap = matplotlib.cm.viridis
