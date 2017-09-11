@@ -219,7 +219,8 @@ class ChatResponder(Thread):
         while connected:
             try:
                 events = self.slack_client.rtm_read()
-            except (WebSocketConnectionClosedException, socket.timeout):
+            #except (WebSocketConnectionClosedException, socket.timeout):
+            except:
                 #couldn't connect. Try to reconnect...
                 connected = self.slack_client.rtm_connect()
                 continue
@@ -585,7 +586,12 @@ class ChatResponder(Thread):
             except KeyError as e:
                 print("Got a malformed message packet", e)
                 return
-            
+
+            # need to check case if it posts an image, then it doesn't need to reply to itself   
+            if "subtype" in event:
+                if event["subtype"] == "file_share":
+                    return
+
             print(u"From {0}@{1}".format(sender, channel))
             msg_parsed = self.parse_txt(msg)
             try:
