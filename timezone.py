@@ -7,7 +7,13 @@ gemini_longitude = -70 - 44/60. - 12.096/3600
 all_timezones = tz.common_timezones
 all_abbreviations = {} # convert from abbreviation to full time zone
 for zone in all_timezones:
-    abbrev = tz.timezone(zone).localize(datetime.now()).strftime('%Z')
+    # santaigo gets CLT
+    if zone == "America/Santiago":
+        abbrev = "CLT"
+    else:
+        abbrev = tz.timezone(zone).localize(datetime.now()).strftime('%Z')
+
+    # still check to make sure no one takes over this abbreviation
     if abbrev == 'CLT' or abbrev == 'CLST' or abbrev == 'CLDT':
         if 'Santiago' not in zone:
             continue
@@ -24,20 +30,20 @@ def get_timezone(tz_abbrev):
     new_tz_abbrev = tz_abbrev
     
     # correct daylight savings
-    if len(new_tz_abbrev) == 3:
-        # check for daylight savings
-        if new_tz_abbrev.upper()[1] == u'D':
-            dst = True
-            # check to make sure the lookup is this version
-            # else switch abbreviation to standard time
-            if not new_tz_abbrev in all_abbreviations:
-                new_tz_abbrev = new_tz_abbrev[0] + u'S' + new_tz_abbrev[2]
-        else:
-            dst = False
-            # check to make sure the lookup is this version
-            # else switch abbreviation to DST time
-            if not new_tz_abbrev in all_abbreviations:
-                new_tz_abbrev = new_tz_abbrev[0] + u'D' + new_tz_abbrev[2]
+    #if len(new_tz_abbrev) == 3:
+    #    # check for daylight savings
+    #    if new_tz_abbrev.upper()[1] == u'D':
+    #        dst = True
+    #        # check to make sure the lookup is this version
+    #        # else switch abbreviation to standard time
+    #        if not new_tz_abbrev in all_abbreviations:
+    #            new_tz_abbrev = new_tz_abbrev[0] + u'S' + new_tz_abbrev[2]
+    #    else:
+    #        dst = False
+    #        # check to make sure the lookup is this version
+    #        # else switch abbreviation to DST time
+    #        if not new_tz_abbrev in all_abbreviations:
+    #            new_tz_abbrev = new_tz_abbrev[0] + u'D' + new_tz_abbrev[2]
     
     # correct UT to UTC
     if new_tz_abbrev.upper() == u'UT':
