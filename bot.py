@@ -134,21 +134,22 @@ class NewImagePoster(FileSystemEventHandler):
         return
     
     
-    def process_new_file_event(self, event):
+    def process_new_file_event(self, filepath):
         """
         Handles what events when a new file / file gets modified:
         
         Args:
-            event: file system event
+            filepath: path to file that was changed
         """
-        filepath = event.src_path
         
         # we are looking for the first PSF subtraction that happens
         if "_Pol" in filepath:
             # for pol, doens't matter if campaign or LLP
             matches = re.findall(r".*m1-(ADI-)?KLmodes-all\.fits", filepath)
         elif "autoreduced_kpop" in filepath:
+            print(filepath)
             if filepath.endswith("_quicklook.png"):
+                #channel = "#gpies-observing"
                 channel = "#gpies-observing"
                 title = filepath.split(os.path.sep)[-1].split(".")[0] # strip the filepath and the file extension
                 print(self.slacker.chat.post_message(channel, "Beep. Boop. I just finished a FMMF reduction for {0}. Here's the quicklook.".format(title), username=username, as_user=True).raw)
@@ -180,14 +181,20 @@ class NewImagePoster(FileSystemEventHandler):
         """
         watchdog function to run when a new file appears
         """
-        self.process_new_file_event(event)
+        self.process_new_file_event(event.src_path)
 
         
     def on_modified(self, event):
         """
         watchdog function to run when an existing file is modified
         """
-        self.process_new_file_event(event)
+        self.process_new_file_event(event.src_path)
+
+    def on_moved(self, event):
+        """
+        watchdog fucntion to run when a file is moved. We care about where it moved to
+        """
+        self.process_new_file_event(event.dest_path)
     
 
 class ChatResponder(Thread):
