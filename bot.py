@@ -148,11 +148,12 @@ class NewImagePoster(FileSystemEventHandler):
             # for pol, doens't matter if campaign or LLP
             matches = re.findall(r".*m1-(ADI-)?KLmodes-all\.fits", filepath)
         elif "autoreduced_kpop" in filepath:
-            matches = re.findall(r".*quicklook\.fits", filepath)
-            channel = "#gpies-observing"
-            title = filepath.split(os.path.sep)[-1].split(".")[0] # strip the filepath and the file extension
-            print(self.slacker.chat.post_message(channel, "Beep. Boop. I just finished a FMMF reduction for {0}. Here's the quicklook.".format(title), username=username, as_user=True).raw)
-            print(self.slacker.files.upload(filepath, channels=channel, filename=filepath.split(os.path.sep)[-1], title=title ).raw)
+            if filepath.endswith("_quicklook.png"):
+                channel = "#gpies-observing"
+                title = filepath.split(os.path.sep)[-1].split(".")[0] # strip the filepath and the file extension
+                print(self.slacker.chat.post_message(channel, "Beep. Boop. I just finished a FMMF reduction for {0}. Here's the quicklook.".format(title), username=username, as_user=True).raw)
+                print(self.slacker.files.upload(filepath, channels=channel, filename=filepath.split(os.path.sep)[-1], title=title ).raw)
+            return
         else: 
             # spec mode
             if self.is_llp:
