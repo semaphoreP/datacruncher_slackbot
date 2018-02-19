@@ -92,6 +92,7 @@ class NewImagePoster(FileSystemEventHandler):
         """
         self.dropboxdir = dropboxdir
         self.newfiles = []
+        self.newfmmffiles = []
         self.lock = threading.Lock()
         self.slacker = slacker_bot
         self.job_number = bot_id # 0 for NewImagerPoster, 1 for ChatResponder, 2 for NewImagePoster-LLP
@@ -133,6 +134,49 @@ class NewImagePoster(FileSystemEventHandler):
         print(self.slacker.files.upload('tmp{0}.png'.format(self.job_number), channels=channel,filename="{0}.png".format(title.replace(" ", "_")), title=title ).raw)
         return
     
+    def process_fmmf_event(self):
+        """
+        Handles a FMMF event specifically. Different from rest of Data Cruncher
+        """
+        with self.lock:
+            if len(self.newfmmffiles) == 0:
+                return
+            
+            filepath = self.newfmmffiles.pop(0)
+ 
+        new_ql = False
+        if filepath.endswith("_quicklook.png"):
+            new_ql = True
+            ql_filepath = filepath
+        else:
+            # rsync could have also synced a folder. check for that
+            if os.path.isdir(filepath):
+                # look for the syncing of the FMMF2018 directory
+                matches = re.findall(r".*FMMF20[0-9]{2}$", filepath)
+                if len(matches) == 0:
+                    return
+
+                print("promising folder. check for quicklook", filepath)
+                for rootdir, subdirs, files in os.walk(filepath):
+                    for fmmf_file in files:
+                        if fmmf_file.endswith("_quicklook.png"):
+                            print("found one", rootdir, fmmf_file)
+                            # might be a new ql. check date modified
+                            dirtime = os.path.getmtime(filepath)
+                            qltime = os.path.getmtime(os.path.join(rootdir, fmmf_file))
+                            deltat = abs(dirtime - qltime)/3600 #in horus
+                            if deltat <= 24: # within a day of each other
+                                print("delta_t", deltat)
+                                new_ql = True
+                                ql_filepath = os.path.join(rootdir, fmmf_file)
+        
+        if new_ql:
+            # post it
+            channel = "#gpies-observing"
+            title = ql_filepath.split(os.path.sep)[-1].split(".")[0] # strip the filepath and the file extension
+            print(self.slacker.chat.post_message(channel, "Beep. Boop. I just finished a FMMF reduction for {0}. Here's the quicklook.".format(title), username=username, as_user=True).raw)
+            print(self.slacker.files.upload(ql_filepath, channels=channel, filename=ql_filepath.split(os.path.sep)[-1], title=title ).raw)
+
     
     def process_new_file_event(self, filepath):
         """
@@ -148,12 +192,13 @@ class NewImagePoster(FileSystemEventHandler):
             matches = re.findall(r".*m1-(ADI-)?KLmodes-all\.fits", filepath)
         elif "autoreduced_kpop" in filepath:
             print(filepath)
-            if filepath.endswith("_quicklook.png"):
-                #channel = "#gpies-observing"
-                channel = "#gpies-observing"
-                title = filepath.split(os.path.sep)[-1].split(".")[0] # strip the filepath and the file extension
-                print(self.slacker.chat.post_message(channel, "Beep. Boop. I just finished a FMMF reduction for {0}. Here's the quicklook.".format(title), username=username, as_user=True).raw)
-                print(self.slacker.files.upload(filepath, channels=channel, filename=filepath.split(os.path.sep)[-1], title=title ).raw)
+            # add item to queue
+            with self.lock:
+                if filepath not in self.newfmmffiles:
+                    print("appending {0}".format(filepath))
+                    self.newfmmffiles.append(filepath)
+            # wait 3 seconds before processing
+            threading.Timer(3., self.process_fmmf_event).start() 
             return
         else: 
             # spec mode
@@ -194,6 +239,7 @@ class NewImagePoster(FileSystemEventHandler):
         """
         watchdog fucntion to run when a file is moved. We care about where it moved to
         """
+        print("move", event.src_path, event.dest_path)
         self.process_new_file_event(event.dest_path)
     
 
