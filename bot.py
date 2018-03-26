@@ -145,7 +145,7 @@ class NewImagePoster(FileSystemEventHandler):
             filepath = self.newfmmffiles.pop(0)
  
         new_ql = False
-        if filepath.endswith("_quicklook.png"):
+        if filepath.endswith("_allquicklooks.png"):
             new_ql = True
             ql_filepath = filepath
         else:
@@ -159,7 +159,7 @@ class NewImagePoster(FileSystemEventHandler):
                 print("promising folder. check for quicklook", filepath)
                 for rootdir, subdirs, files in os.walk(filepath):
                     for fmmf_file in files:
-                        if fmmf_file.endswith("_quicklook.png"):
+                        if fmmf_file.endswith("_allquicklooks.png"):
                             print("found one", rootdir, fmmf_file)
                             # might be a new ql. check date modified
                             dirtime = os.path.getmtime(filepath)
@@ -172,7 +172,7 @@ class NewImagePoster(FileSystemEventHandler):
         
         if new_ql:
             # post it
-            channel = "#gpies-observing"
+            channel = "#gpies-data"
             title = ql_filepath.split(os.path.sep)[-1].split(".")[0] # strip the filepath and the file extension
             print(self.slacker.chat.post_message(channel, "Beep. Boop. I just finished a FMMF reduction for {0}. Here's the quicklook.".format(title), username=username, as_user=True).raw)
             print(self.slacker.files.upload(ql_filepath, channels=channel, filename=ql_filepath.split(os.path.sep)[-1], title=title ).raw)
