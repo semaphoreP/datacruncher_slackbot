@@ -191,6 +191,9 @@ class NewImagePoster(FileSystemEventHandler):
             # for pol, doens't matter if campaign or LLP
             matches = re.findall(r".*m1-(ADI-)?KLmodes-all\.fits", filepath)
         elif "autoreduced_kpop" in filepath:
+            if "Non-Campaign" in filepath:
+                # don't post queue stuff for FMMF
+                return
             print(filepath)
             # add item to queue
             with self.lock:
